@@ -1,5 +1,5 @@
 # TSPANv2
-TSPANv2 (Temporal SPAN) is a custom VSR architecture, and is a continuation of [TSPAN](https://github.com/Kim2091/TSPAN). This version focuses on improving the temporal component of the model. It supports PyTorch, ONNX, and TensorRT!
+TSPANv2 (Temporal SPAN) is a custom VSR architecture, and is a continuation of [TSPAN](https://github.com/Kim2091/TSPAN). This version focuses on improving the temporal component of the architecture. It provides a drastic improvement in overall temporal stability and quality! This arch has support for PyTorch, ONNX, and TensorRT.
 
 This is the inference and ONNX conversion code. To train a model, you'll want to use [traiNNer-redux](https://github.com/the-database/traiNNer-redux) with the TSPANv2 config and a video dataset (WIP!). For easier inference, try out [Vapourkit](https://github.com/Kim2091/vapourkit). To make a video dataset, try my other tool, [video destroyer](https://github.com/Kim2091/video-destroyer).
 
