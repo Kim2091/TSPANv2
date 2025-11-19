@@ -4,7 +4,6 @@ import cv2
 import os
 import argparse
 import time
-from glob import glob
 import math
 from datetime import timedelta
 from fractions import Fraction
@@ -17,12 +16,16 @@ from utils import utils_image as util
 def detect_model_precision(model_path, session):
     if '_fp16' in model_path.lower():
         return 'fp16'
+    elif '_bf16' in model_path.lower():
+        return 'bf16'
     elif '_fp32' in model_path.lower():
         return 'fp32'
     
     input_type = session.get_inputs()[0].type
     if 'float16' in input_type:
         return 'fp16'
+    elif 'bfloat16' in input_type:
+        return 'bf16'
     
     return 'fp32'
 
@@ -44,7 +47,7 @@ def main():
     parser.add_argument('--presize', action='store_true', help='resize video before processing')
     parser.add_argument('--providers', type=str, default='DmlExecutionProvider,CPUExecutionProvider', 
                         help='ONNX Runtime execution providers, comma separated')
-    parser.add_argument('--precision', type=str, default=None, choices=['fp16', 'fp32'],
+    parser.add_argument('--precision', type=str, default=None, choices=['fp16', 'bf16', 'fp32'],
                         help='Model precision (auto-detected if not specified)')
     parser.add_argument('--gui-mode', action='store_true', 
                         help='Output progress in a format optimized for GUI parsing')
@@ -88,7 +91,7 @@ def main():
     if not args.video and not os.path.isdir(E_path) and os.path.isdir(L_path):
         E_path = os.path.dirname(E_path)
     
-    if not model_path.endswith('_fp32.onnx') and not model_path.endswith('_fp16.onnx'):
+    if not model_path.endswith('_fp32.onnx') and not model_path.endswith('_fp16.onnx') and not model_path.endswith('_bf16.onnx'):
         if args.precision:
             base_path = os.path.splitext(model_path)[0]
             if base_path.endswith('.onnx'):
@@ -101,13 +104,16 @@ def main():
             
             fp32_path = f"{base_path}_fp32.onnx"
             fp16_path = f"{base_path}_fp16.onnx"
+            bf16_path = f"{base_path}_bf16.onnx"
             
             if os.path.exists(fp32_path):
                 model_path = fp32_path
             elif os.path.exists(fp16_path):
                 model_path = fp16_path
+            elif os.path.exists(bf16_path):
+                model_path = bf16_path
             else:
-                logger.error(f'Error: Could not find model at {fp32_path} or {fp16_path}')
+                logger.error(f'Error: Could not find model at {fp32_path}, {fp16_path}, or {bf16_path}')
                 return
     
     logger.info(f"Loading ONNX model from {model_path}")
@@ -140,6 +146,9 @@ def main():
     
     if model_precision == 'fp16':
         test_input = np.zeros((1, clip_size * 3, test_height, test_width), dtype=np.float16)
+    elif model_precision == 'bf16':
+        # Note: NumPy doesn't have native bfloat16, ONNX Runtime handles conversion
+        test_input = np.zeros((1, clip_size * 3, test_height, test_width), dtype=np.float32)
     else:
         test_input = np.zeros((1, clip_size * 3, test_height, test_width), dtype=np.float32)
     
@@ -292,6 +301,9 @@ def main():
 
             if model_precision == 'fp16':
                 padded_window = padded_window.astype(np.float16)
+            elif model_precision == 'bf16':
+                # Note: NumPy doesn't have native bfloat16, ONNX Runtime handles conversion
+                padded_window = padded_window.astype(np.float32)
             else:
                 padded_window = padded_window.astype(np.float32)
 
@@ -304,7 +316,7 @@ def main():
 
             img_E_np = outputs[0][0]
             
-            if model_precision == 'fp16':
+            if model_precision in ['fp16', 'bf16']:
                 img_E_np = img_E_np.astype(np.float32)
 
             input_window.pop(0)

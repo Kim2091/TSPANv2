@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 # Import the correct model architecture
-from models.temporal_span_arch import Vsrspan
+from models.tspanv2 import Vsrspan
 
 class TemporalSPANExportWrapper(torch.nn.Module):
     """

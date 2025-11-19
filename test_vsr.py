@@ -8,7 +8,7 @@ from datetime import timedelta
 from utils import utils_image as util
 from utils.logger import logger
 from utils.utils_video import VideoDecoder, VideoEncoder
-from models.temporal_span_arch import Vsrspan as net
+from models.tspanv2 import Vsrspan as net
 
 if not torch.cuda.is_available():
     logger.error('CUDA is not available. Exiting...')
@@ -39,6 +39,8 @@ def main():
     parser.add_argument('--output', type=str, required=True, help='path of output video')
     parser.add_argument('--video_codec', type=str, default='libx264', help='ffmpeg video codec', choices=['dnxhd', 'libx264', 'libx265'])
     parser.add_argument('--crf', type=int, default=15, help='Constant Rate Factor (CRF) for x264/x265 codecs')
+    parser.add_argument('--precision', type=str, default='fp32', choices=['fp16', 'bf16', 'fp32'],
+                        help='Inference precision: fp16 (half precision), bf16 (bfloat16), or fp32 (full precision)')
     parser.add_argument('--gui-mode', action='store_true', help='Output progress in a format optimized for GUI parsing')
 
     args = parser.parse_args()
@@ -68,9 +70,9 @@ def main():
     state_dict = checkpoint.get('params_ema', checkpoint)
 
     # Infer scale from checkpoint
-    if 'upsampler.0.weight' in state_dict:
-        upsampler_weight = state_dict['upsampler.0.weight']
-        scale = int((upsampler_weight.shape[0] / 3) ** 0.5)
+    if 'm_upsample.0.weight' in state_dict:
+        upsampler_weight = state_dict['m_upsample.0.weight']
+        scale = int((upsampler_weight.shape[0] / 48) ** 0.5)
     else:
         scale = 4  # default
 
@@ -94,12 +96,36 @@ def main():
 
     for k, v in model.named_parameters():
         v.requires_grad = False
-    model = model.to(default_device)    
+    model = model.to(default_device)
+    
+    # Set inference precision based on argument
+    inference_dtype = torch.float32
+    
+    if args.precision == 'fp16':
+        props = torch.cuda.get_device_properties(default_device)
+        # Check if FP16 is supported (compute capability 5.3+)
+        if props.major > 5 or (props.major == 5 and props.minor >= 3):
+            model = model.to(torch.float16)
+            inference_dtype = torch.float16
+            logger.info('Using FP16 precision for inference')
+        else:
+            logger.warning('FP16 not supported on this device (requires compute capability 5.3+), using FP32')
+            inference_dtype = torch.float32
+    elif args.precision == 'bf16':
+        if torch.cuda.is_bf16_supported():
+            model = model.to(torch.bfloat16)
+            inference_dtype = torch.bfloat16
+            logger.info('Using BF16 precision for inference')
+        else:
+            logger.warning('BF16 not supported on this device, using FP32')
+            inference_dtype = torch.float32
+    else:
+        logger.info('Using FP32 precision for inference')    
     
     # warmup
     input_shape = (1, clip_size, 3, 540, 720)
-    dummy_input = torch.randn(input_shape).to(default_device, dtype=default_dtype)
-    with torch.no_grad(), torch.amp.autocast('cuda', dtype=default_dtype):
+    dummy_input = torch.randn(input_shape).to(default_device, dtype=inference_dtype)
+    with torch.no_grad(), torch.amp.autocast('cuda', dtype=inference_dtype):
         _ = model(dummy_input)
 
     logger.info(f'Model path: {model_path}')
@@ -154,7 +180,7 @@ def main():
                     # Reflect pad the end of the window
                     input_window.extend(input_window[clip_size//2-1:-1][::-1])
             else:
-                img_L_t = util.uint2tensor4(img_L).to(default_device, dtype=default_dtype)
+                img_L_t = util.uint2tensor4(img_L).to(default_device, dtype=inference_dtype)
                 input_window.append(img_L_t)
 
             if len(input_window) < clip_size and end_of_video:
@@ -167,7 +193,7 @@ def main():
 
             window = torch.stack(input_window[:clip_size], dim=1)
             
-            with torch.amp.autocast('cuda', dtype=default_dtype):
+            with torch.amp.autocast('cuda', dtype=inference_dtype):
                 img_E = model(window)
             
             del window

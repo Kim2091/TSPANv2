@@ -1,11 +1,10 @@
 import sys
 import os
-import signal
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QLabel, QLineEdit, QPushButton, 
-                           QFileDialog, QCheckBox, QGroupBox, QMessageBox,
+                           QFileDialog, QGroupBox, QMessageBox,
                            QProgressBar, QComboBox, QTextEdit)
-from PyQt6.QtCore import Qt, QProcess, QRegularExpression
+from PyQt6.QtCore import Qt, QProcess
 
 class FileDropWidget(QWidget):
     def __init__(self, placeholder_text="Drop file here or click to browse", parent=None):
@@ -142,11 +141,22 @@ class VSRGUIApp(QMainWindow):
         
         options_layout.addLayout(codec_layout)
         
-        # FP16 checkbox for ONNX mode
-        self.fp16_checkbox = QCheckBox("Use FP16 precision")
-        self.fp16_checkbox.setVisible(False)  # Hidden by default (shown only for ONNX)
-        self.fp16_checkbox.setToolTip("Enable FP16 (half precision) for faster inference with compatible models")
-        options_layout.addWidget(self.fp16_checkbox)
+        # Precision selection
+        precision_layout = QHBoxLayout()
+        precision_layout.addWidget(QLabel("Precision:"))
+        
+        self.precision_combo = QComboBox()
+        self.precision_combo.addItems(["FP32 (Full)", "FP16 (Half)", "BF16 (BFloat16)"])
+        self.precision_combo.setCurrentIndex(0)  # Default to FP32
+        self.precision_combo.setToolTip(
+            "FP32: Full precision (slowest, most accurate)\n"
+            "FP16: Half precision (faster, requires compute 5.3+)\n"
+            "BF16: BFloat16 precision (faster, requires Ampere or newer)"
+        )
+        precision_layout.addWidget(self.precision_combo)
+        precision_layout.addStretch(1)
+        
+        options_layout.addLayout(precision_layout)
         
         options_group.setLayout(options_layout)
         
@@ -226,10 +236,8 @@ class VSRGUIApp(QMainWindow):
         # Update placeholder text and file filter based on selection
         if index == 0:  # PyTorch
             self.model_path_edit.setPlaceholderText("Select a PyTorch model file (.pth)")
-            self.fp16_checkbox.setVisible(False)  # Hide FP16 checkbox for PyTorch
         else:  # ONNX
             self.model_path_edit.setPlaceholderText("Select an ONNX model file (.onnx)")
-            self.fp16_checkbox.setVisible(True)  # Show FP16 checkbox for ONNX
         
         # Clear current selection
         self.model_path_edit.clear()
@@ -299,9 +307,13 @@ class VSRGUIApp(QMainWindow):
             "--gui-mode"
         ]
         
-        # Add FP16 precision flag for ONNX mode if checkbox is checked
-        if self.model_type_combo.currentIndex() == 1 and self.fp16_checkbox.isChecked():
+        # Add precision argument based on dropdown selection
+        precision_index = self.precision_combo.currentIndex()
+        if precision_index == 1:  # FP16
             cmd.extend(["--precision", "fp16"])
+        elif precision_index == 2:  # BF16
+            cmd.extend(["--precision", "bf16"])
+        # FP32 is default, no need to add argument
         
         # Clear previous log
         self.log_box.clear()
