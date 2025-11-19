@@ -8,7 +8,7 @@ from datetime import timedelta
 from utils import utils_image as util
 from utils.logger import logger
 from utils.utils_video import VideoDecoder, VideoEncoder
-from models.tspanv2 import Vsrspan as net
+from models.tspanv2 import TSPANv2 as net
 
 if not torch.cuda.is_available():
     logger.error('CUDA is not available. Exiting...')

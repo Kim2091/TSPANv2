@@ -20,11 +20,11 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 # Import the correct model architecture
-from models.tspanv2 import Vsrspan
+from models.tspanv2 import TSPANv2
 
 class TemporalSPANExportWrapper(torch.nn.Module):
     """
-    A simple wrapper for the Vsrspan model to handle
+    A simple wrapper for the TSPANv2 model to handle
     the input shape transformation required for ONNX export. The rest of the
     script expects a 4D tensor, while the model's forward pass expects a 5D tensor.
     """
@@ -148,7 +148,7 @@ def load_model_from_state(state_dict, in_nc=3, out_nc=3, clip_size=5,
                           dim=48, upscale=4, bias=False, num_blocks=6,
                           residual=True, img_range=255., use_checkpoint=False):
     """
-    Load a Vsrspan model from a state dict.
+    Load a TSPANv2 model from a state dict.
     
     Args:
         state_dict: The state dictionary to load
@@ -164,7 +164,7 @@ def load_model_from_state(state_dict, in_nc=3, out_nc=3, clip_size=5,
         use_checkpoint: Use gradient checkpointing (default: False)
     
     Returns:
-        Loaded Vsrspan model
+        Loaded TSPANv2 model
     """
     # Try to infer parameters from state dict if they exist
     if 'params' in state_dict:
@@ -192,7 +192,7 @@ def load_model_from_state(state_dict, in_nc=3, out_nc=3, clip_size=5,
         upscale = detected_scale
     
     # Create the model with the correct parameters
-    model = Vsrspan(
+    model = TSPANv2(
         in_nc=in_nc,
         out_nc=out_nc,
         clip_size=clip_size,
@@ -215,7 +215,7 @@ def convert_model_to_onnx(model_path, onnx_path, input_shape, dynamic=False, ver
                          upscale=4, bias=False, num_blocks=6, residual=True, 
                          img_range=255., use_checkpoint=False):
     """
-    Convert a Vsrspan PyTorch model to ONNX format.
+    Convert a TSPANv2 PyTorch model to ONNX format.
     """
     logger.info(f"Loading PyTorch model from: {model_path}")
     device = torch.device('cpu')
