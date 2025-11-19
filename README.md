@@ -1,2 +1,81 @@
 # TSPANv2
-An enhanced temporal video upscaler based on SPAN
+TSPANv2 (Temporal SPAN) is a custom VSR architecture, and is a continuation of [TSPAN](https://github.com/Kim2091/TSPAN). This version focuses on improving the temporal component of the model. It supports PyTorch, ONNX, and TensorRT!
+
+This is the inference and ONNX conversion code. To train a model, you'll want to use [traiNNer-redux](https://github.com/the-database/traiNNer-redux) with the TSPANv2 config and a video dataset (WIP!). For easier inference, try out [Vapourkit](https://github.com/Kim2091/vapourkit). To make a video dataset, try my other tool, [video destroyer](https://github.com/Kim2091/video-destroyer).
+
+## Getting Started
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/Kim2091/TSPANv2
+    ```
+
+2.  **Install PyTorch with CUDA**:
+    Follow the instructions at [pytorch.org](https://pytorch.org/get-started/locally/).
+
+3.  **Install required packages**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Usage
+
+You can use TSPANv2 through the included graphical user interface (GUI), [Vapourkit](https://github.com/Kim2091/vapourkit), or the command line.
+
+## TensorRT
+
+For high-performance inference, refer to the [TensorRT guide](tensorrt/README.md).
+
+### GUI Usage
+
+For an easy-to-use experience with PyTorch or ONNX models, launch the GUI:
+
+```bash
+python vsr_gui.py
+```
+
+<img width="602" height="698" alt="image" src="https://github.com/user-attachments/assets/744fd695-3fe8-4dc7-b52c-f3bca423e13c" />
+
+
+### Command-Line Usage
+
+For more advanced control, you can use the command-line scripts.
+
+**Video upscaling (PyTorch)**:
+```bash
+python test_vsr.py --model_path pretrained_models/tspan.pth --input path/to/video.mp4 --output path/to/output.mp4
+```
+
+**ONNX Video upscaling**:
+```bash
+python test_onnx.py --model_path model.onnx --input path/to/video.mp4 --output path/to/output.mp4
+```
+
+Key arguments for `test_vsr.py` and `test_onnx.py`:
+-   `--video_codec`: Specify the video codec (e.g., `libx264`, `libx265`).
+-   `--crf`: Set the Constant Rate Factor for quality (for `libx264`/`libx265`).
+-   `--providers`: (ONNX only) Set ONNX Runtime execution providers.
+
+## Tools
+
+Utility scripts are located in the `tools/` directory.
+
+**Convert PyTorch model to ONNX**:
+```bash
+python tools/convert_to_onnx.py --model pretrained_models/model.pth --output model.onnx
+```
+-   `--dynamic`: Create a model that supports various input sizes.
+-   `--fp16`: Convert the model to FP16 for a speed boost.
+
+## Credits (thanks all!)
+Thank you to leobby, Hermes, and Bendel for testing the arch!
+- Uses [SCUNet](https://github.com/aaf6aa/SCUNet)'s respository as a base
+- Uses a modified version of [SPAN](https://github.com/hongyuanyu/SPAN)'s architecture
+- Uses the additions made in both the [SCUNet fork](https://github.com/aaf6aa/SCUNet) and [TSCUNet](https://github.com/Kim2091/TSCUNet) repositories
+- Is a continuation of the original [TSPAN](https://github.com/Kim2091/TSPAN)
+
+
+
+
+
+
