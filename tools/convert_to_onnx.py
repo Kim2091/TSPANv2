@@ -5,8 +5,6 @@ import os
 import sys
 import numpy as np
 import onnx
-from onnxconverter_common import float16
-import onnxslim
 import logging
 
 # Add parent directory to path for imports
@@ -116,32 +114,40 @@ def verify_onnx_output(model, onnx_path, test_input, rtol=1e-3, atol=1e-4):
         logger.error(f"❌ Error during ONNX verification: {str(e)}")
         return False
 
-def convert_to_fp16(model_path, output_path=None):
-    """Convert an ONNX model to FP16 precision."""
-    if output_path is None:
-        base_path = model_path.replace('_fp32.onnx', '')
-        output_path = f"{base_path}_fp16.onnx"
-    
-    logger.info(f"\nConverting model to FP16...")
-    logger.info(f"Loading ONNX model from: {model_path}")
+def export_model_fp16(export_model, dummy_input, output_path, dynamic_axes, device):
+    """
+    Export model directly to FP16 ONNX by converting PyTorch model to half precision first.
+    This is more reliable than post-converting the ONNX graph.
+    """
+    logger.info(f"\nExporting model to ONNX (FP16): {output_path}")
     
     try:
-        onnx_model = onnx.load(model_path)
-        onnx_model_fp16 = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
+        # Convert model to FP16
+        export_model_fp16 = export_model.half()
+        export_model_fp16.eval()
         
-        # Apply onnxslim to simplify and potentially fix fp16 model issues
-        logger.info("Applying onnxslim optimization pass to FP16 model...")
-        try:
-            onnx_model_fp16 = onnxslim.slim(onnx_model_fp16)
-            logger.info("✓ FP16 model optimized successfully with onnxslim")
-        except Exception as e:
-            logger.warning(f"⚠ onnxslim optimization failed: {e}. Saving unoptimized model...")
+        # Create FP16 dummy input
+        dummy_input_fp16 = dummy_input.half()
         
-        onnx.save(onnx_model_fp16, output_path)
-        logger.info(f"Successfully saved FP16 model to: {output_path}")
+        # Export directly to ONNX with FP16 weights
+        torch.onnx.export(
+            export_model_fp16,
+            dummy_input_fp16,
+            output_path,
+            export_params=True,
+            opset_version=17,
+            do_constant_folding=True,
+            input_names=['input'],
+            output_names=['output'],
+            dynamic_axes=dynamic_axes,
+        )
+        
+        logger.info(f"✓ Successfully saved FP16 model to: {output_path}")
         return True
     except Exception as e:
-        logger.error(f"❌ Error during FP16 conversion: {e}")
+        logger.error(f"❌ Error during FP16 export: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def load_model_from_state(state_dict, in_nc=3, out_nc=3, clip_size=5, 
@@ -270,7 +276,8 @@ def convert_model_to_onnx(model_path, onnx_path, input_shape, dynamic=False, ver
             verify_onnx_output(export_model, fp32_path, dummy_input)
         
         if fp16:
-            convert_to_fp16(fp32_path)
+            fp16_path = f"{base_path}_fp16.onnx"
+            export_model_fp16(export_model, dummy_input, fp16_path, dynamic_axes, device)
             
     except Exception as e:
         logger.error(f"❌ Error during ONNX export: {e}")
