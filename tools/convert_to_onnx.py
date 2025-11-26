@@ -114,24 +114,40 @@ def verify_onnx_output(model, onnx_path, test_input, rtol=1e-3, atol=1e-4):
         logger.error(f"❌ Error during ONNX verification: {str(e)}")
         return False
 
-def export_model_fp16(export_model, dummy_input, output_path, dynamic_axes, device):
+def export_model_fp16(model, dummy_input, output_path, dynamic_axes, device):
     """
     Export model directly to FP16 ONNX by converting PyTorch model to half precision first.
     This is more reliable than post-converting the ONNX graph.
+    
+    Args:
+        model: The base TSPANv2 model (not wrapped)
+        dummy_input: The dummy input tensor (will be converted to FP16)
+        output_path: Path to save the FP16 ONNX model
+        dynamic_axes: Dynamic axes configuration for ONNX export
+        device: Device to use for export
     """
     logger.info(f"\nExporting model to ONNX (FP16): {output_path}")
     
+    # Warn if using CPU for FP16 - it's extremely slow
+    if device.type == 'cpu':
+        logger.warning("⚠ FP16 export on CPU is very slow. Consider using CUDA if available.")
+    
     try:
-        # Convert model to FP16
-        export_model_fp16 = export_model.half()
-        export_model_fp16.eval()
+        # Convert model to FP16 first, then wrap for ONNX export
+        model_fp16 = model.half()
+        model_fp16.eval()
+        model_fp16 = model_fp16.to(device)
         
-        # Create FP16 dummy input
-        dummy_input_fp16 = dummy_input.half()
+        # Create the export wrapper around the FP16 model
+        export_wrapper_fp16 = TemporalSPANExportWrapper(model_fp16)
+        export_wrapper_fp16.eval()
+        
+        # Create FP16 dummy input on the same device
+        dummy_input_fp16 = dummy_input.half().to(device)
         
         # Export directly to ONNX with FP16 weights
         torch.onnx.export(
-            export_model_fp16,
+            export_wrapper_fp16,
             dummy_input_fp16,
             output_path,
             export_params=True,
@@ -224,7 +240,14 @@ def convert_model_to_onnx(model_path, onnx_path, input_shape, dynamic=False, ver
     Convert a TSPANv2 PyTorch model to ONNX format.
     """
     logger.info(f"Loading PyTorch model from: {model_path}")
-    device = torch.device('cpu')
+    
+    # Use CUDA if available, especially important for FP16 export (CPU FP16 is extremely slow)
+    if fp16 and torch.cuda.is_available():
+        device = torch.device('cuda')
+        logger.info("Using CUDA for export (required for efficient FP16 conversion)")
+    else:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info(f"Using device: {device}")
     
     # Load model state dict and initialize the model
     state_dict = torch.load(model_path, map_location=device)
@@ -277,7 +300,8 @@ def convert_model_to_onnx(model_path, onnx_path, input_shape, dynamic=False, ver
         
         if fp16:
             fp16_path = f"{base_path}_fp16.onnx"
-            export_model_fp16(export_model, dummy_input, fp16_path, dynamic_axes, device)
+            # Pass the base model (not wrapped) so FP16 conversion happens before wrapping
+            export_model_fp16(model, dummy_input, fp16_path, dynamic_axes, device)
             
     except Exception as e:
         logger.error(f"❌ Error during ONNX export: {e}")
