@@ -3,6 +3,13 @@ TSPANv2 (Temporal SPAN) is a custom VSR architecture, and is a continuation of [
 
 This is the inference and ONNX conversion code. To train a model, you'll want to use [traiNNer-redux](https://github.com/the-database/traiNNer-redux) with the TSPANv2 config and a video dataset (WIP!). For easier inference, try out [Vapourkit](https://github.com/Kim2091/vapourkit). To make a video dataset, try my other tool, [video destroyer](https://github.com/Kim2091/video-destroyer).
 
+## Samples:
+
+Rainbow and Dot Crawl removal:
+
+https://github.com/user-attachments/assets/942f75b9-53d5-43ba-bd5c-c4c2a616536e
+
+
 ## Getting Started
 
 1.  **Clone the repository**:
